@@ -8,21 +8,22 @@
     <link rel="stylesheet" href="style.css">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" href="https://asnise.github.io/logo.png" type="image/icon type">
+    <!-- เพิ่ม LZString สำหรับการบีบอัดข้อมูล -->
+    <script src="https://cdn.jsdelivr.net/npm/lz-string@1.4.4/libs/lz-string.min.js"></script>
 </head>
 
 <body>
     <div class="controls">
-
         <div class="import-export">
             <div class="export-control">
                 <button id="export-btn" class="control-btn">Export</button>
                 <div id="export-token" class="token-display"></div>
-
-                                <button id="theme-toggle" class="theme-toggle"><i class="fas fa-moon"></i></button>
-            </div>
+                <button id="theme-toggle" class="theme-toggle"><i class="fas fa-moon"></i></button>
+            </div> 
             <div class="import-control">
                 <input type="text" id="import-input" placeholder="Paste token here">
                 <button id="import-btn" class="control-btn">Import</button>
+                <div id="import-status" class="status-message"></div>
             </div>
             <p>(Ctrl + Click) on connections <br>add nodes between them.</p>
         </div>

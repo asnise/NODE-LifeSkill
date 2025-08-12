@@ -302,79 +302,115 @@ function generateToken() {
 }
 
 function exportSkillTree() {
-    const nodes = Array.from(document.querySelectorAll('.node')).map(node => ({
-        id: node.dataset.id,
-        x: parseInt(node.style.left),
-        y: parseInt(node.style.top),
-        text: node.querySelector('.node-content').textContent,
-        isCentral: node.classList.contains('central-node')
-    }));
+    // 1. Ultra-compact data structure with arrays instead of objects
+    const nodes = Array.from(document.querySelectorAll('.node')).map(node => [
+        node.dataset.id,                            // 0: id
+        parseInt(node.style.left),                  // 1: x
+        parseInt(node.style.top),                   // 2: y
+        node.querySelector('.node-content').textContent, // 3: text
+        node.classList.contains('central-node')     // 4: isCentral
+    ]);
 
-    const connectionsData = connections.map(conn => ({
-        node1: conn.node1.dataset.id,
-        node2: conn.node2.dataset.id
-    }));
+    const connectionsData = connections.map(conn => [
+        conn.node1.dataset.id,                     // 0: node1
+        conn.node2.dataset.id                      // 1: node2
+    ]);
 
-    const data = {
-        nodes: nodes,
-        connections: connectionsData,
-        darkMode: darkMode
-    };
+    const data = [
+        nodes,                                      // 0: nodes
+        connectionsData,                            // 1: connections
+        darkMode                                   // 2: darkMode
+    ];
 
+    // 2. Convert to compact JSON with no whitespace
     const jsonString = JSON.stringify(data);
-    const token = generateToken();
-    localStorage.setItem(`skillTree_${token}`, jsonString);
     
-    return token;
+    // 3. Apply multiple compression layers
+    // a) First compress with LZString (most effective)
+    let compressed = LZString.compressToBase64(jsonString);
+    
+    // b) URL-safe character replacement
+    const charMap = {
+        '==': '.',  // Common Base64 padding
+        'AAA': '!',
+        'AAE': '@',
+        'AEA': '#',
+        'AEE': '$',
+        'EAA': '%',
+        'EAE': '^',
+        'EEA': '&',
+        'EEE': '*'
+    };
+    
+    // Replace common patterns with single chars
+    for (const [pattern, replacement] of Object.entries(charMap)) {
+        compressed = compressed.split(pattern).join(replacement);
+    }
+    
+    return compressed;
 }
 
 function importSkillTree(token) {
-    const jsonString = localStorage.getItem(`skillTree_${token}`);
-    if (!jsonString) return false;
-
-    const data = JSON.parse(jsonString);
-    if (!data.nodes || !data.connections) return false;
-
-    document.getElementById('skill-tree').innerHTML = '';
-    connections.length = 0;
-    nodeId = 0;
-
-    const nodeMap = {};
-    data.nodes.forEach(nodeData => {
-        const node = createNode(
-            nodeData.x,
-            nodeData.y,
-            nodeData.text,
-            80,
-            80,
-            nodeData.isCentral
-        );
-        document.getElementById('skill-tree').appendChild(node);
-        makeDraggable(node);
-        nodeMap[nodeData.id] = node;
-        if (nodeData.isCentral) centralNode = node;
-    });
-
-    data.connections.forEach(connData => {
-        const node1 = nodeMap[connData.node1];
-        const node2 = nodeMap[connData.node2];
-        if (node1 && node2) createConnection(node1, node2);
-    });
-
-    if (data.darkMode !== undefined) {
-        darkMode = data.darkMode;
-        const body = document.body;
-        const themeToggle = document.getElementById('theme-toggle');
-        if (darkMode) {
-            body.classList.remove('light-theme');
-            themeToggle.innerHTML = '<i class="fas fa-moon"></i>';
-        } else {
-            body.classList.add('light-theme');
-            themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
+    try {
+        // 1. Reverse character replacements
+        const charMap = {
+            '.': '==',
+            '!': 'AAA',
+            '@': 'AAE',
+            '#': 'AEA',
+            '$': 'AEE',
+            '%': 'EAA',
+            '^': 'EAE',
+            '&': 'EEA',
+            '*': 'EEE'
+        };
+        
+        let restored = token;
+        for (const [short, long] of Object.entries(charMap)) {
+            restored = restored.split(short).join(long);
         }
-    }
+        
+        // 2. Decompress
+        const jsonString = LZString.decompressFromBase64(restored);
+        if (!jsonString) return false;
+        
+        // 3. Parse compact array structure
+        const data = JSON.parse(jsonString);
+        
+        // Clear existing tree
+        document.getElementById('skill-tree').innerHTML = '';
+        connections.length = 0;
+        nodeId = 0;
 
-    return true;
+        // Rebuild nodes
+        const nodeMap = {};
+        data[0].forEach(node => {
+            const n = createNode(node[1], node[2], node[3], 80, 80, node[4]);
+            document.getElementById('skill-tree').appendChild(n);
+            makeDraggable(n);
+            nodeMap[node[0]] = n;
+            if (node[4]) centralNode = n;
+        });
+
+        // Rebuild connections
+        data[1].forEach(conn => {
+            const n1 = nodeMap[conn[0]], n2 = nodeMap[conn[1]];
+            if (n1 && n2) createConnection(n1, n2);
+        });
+
+        // Restore theme
+        if (data[2] !== undefined) {
+            darkMode = data[2];
+            document.body.classList.toggle('light-theme', !darkMode);
+            document.getElementById('theme-toggle').innerHTML = 
+                darkMode ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
+        }
+
+        return true;
+    } catch (e) {
+        console.error('Import failed:', e);
+        return false;
+    }
 }
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -392,6 +428,21 @@ document.addEventListener('DOMContentLoaded', function () {
         const tokenDisplay = document.getElementById('export-token');
         tokenDisplay.textContent = token;
         
+        navigator.clipboard.writeText(token).then(() => {
+            const originalText = tokenDisplay.textContent;
+            tokenDisplay.textContent = 'Copied to clipboard!';
+            setTimeout(() => {
+                tokenDisplay.textContent = originalText;
+            }, 2000);
+        });
+    });
+
+     document.getElementById('export-btn').addEventListener('click', () => {
+        const token = exportSkillTree();
+        const tokenDisplay = document.getElementById('export-token');
+        tokenDisplay.textContent = token;
+        
+        // คัดลอก token ไปยัง clipboard
         navigator.clipboard.writeText(token).then(() => {
             const originalText = tokenDisplay.textContent;
             tokenDisplay.textContent = 'Copied to clipboard!';
@@ -424,11 +475,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     document.getElementById('skill-tree').addEventListener('mousedown', startSelection);
 
-    document.getElementById('import-input').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            document.getElementById('import-btn').click();
-        }
-    });
+
 });
 
 let selectedNodes = new Set();
