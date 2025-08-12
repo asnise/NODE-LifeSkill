@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@200&amp;display=swap" rel="stylesheet">
+    <title>NODE LifeSkill</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="https://asnise.github.io/logo.png" type="image/icon type">
+</head>
+
+<body>
+    <div class="controls">
+
+        <div class="import-export">
+            <div class="export-control">
+                <button id="export-btn" class="control-btn">Export</button>
+                <div id="export-token" class="token-display"></div>
+
+                                <button id="theme-toggle" class="theme-toggle"><i class="fas fa-moon"></i></button>
+            </div>
+            <div class="import-control">
+                <input type="text" id="import-input" placeholder="Paste token here">
+                <button id="import-btn" class="control-btn">Import</button>
+            </div>
+            <p>(Ctrl + Click) on connections <br>add nodes between them.</p>
+        </div>
+    </div>
+    <div id="skill-tree"></div>
+    <script src="script.js"></script>
+</body>
+
+</html>
