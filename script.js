@@ -301,103 +301,56 @@ function generateToken() {
     return token;
 }
 
+// Ultra-compact export (returns minimal JSON string)
 function exportSkillTree() {
-    // 1. Ultra-compact data structure with arrays instead of objects
-    const nodes = Array.from(document.querySelectorAll('.node')).map(node => [
-        node.dataset.id,                            // 0: id
-        parseInt(node.style.left),                  // 1: x
-        parseInt(node.style.top),                   // 2: y
-        node.querySelector('.node-content').textContent, // 3: text
-        node.classList.contains('central-node')     // 4: isCentral
-    ]);
-
-    const connectionsData = connections.map(conn => [
-        conn.node1.dataset.id,                     // 0: node1
-        conn.node2.dataset.id                      // 1: node2
-    ]);
-
     const data = [
-        nodes,                                      // 0: nodes
-        connectionsData,                            // 1: connections
-        darkMode                                   // 2: darkMode
+        // Nodes array: [id, x, y, text, isCentral]
+        [...document.querySelectorAll('.node')].map(n => [
+            n.dataset.id,
+            parseInt(n.style.left),
+            parseInt(n.style.top),
+            n.querySelector('.node-content').textContent,
+            n.classList.contains('central-node')
+        ]),
+        
+        // Connections array: [id1, id2]
+        connections.map(c => [c.node1.dataset.id, c.node2.dataset.id]),
+        
+        // Dark mode flag
+        darkMode
     ];
-
-    // 2. Convert to compact JSON with no whitespace
-    const jsonString = JSON.stringify(data);
     
-    // 3. Apply multiple compression layers
-    // a) First compress with LZString (most effective)
-    let compressed = LZString.compressToBase64(jsonString);
-    
-    // b) URL-safe character replacement
-    const charMap = {
-        '==': '.',  // Common Base64 padding
-        'AAA': '!',
-        'AAE': '@',
-        'AEA': '#',
-        'AEE': '$',
-        'EAA': '%',
-        'EAE': '^',
-        'EEA': '&',
-        'EEE': '*'
-    };
-    
-    // Replace common patterns with single chars
-    for (const [pattern, replacement] of Object.entries(charMap)) {
-        compressed = compressed.split(pattern).join(replacement);
-    }
-    
-    return compressed;
+    return JSON.stringify(data);
 }
 
-function importSkillTree(token) {
+// Import from compact JSON
+function importSkillTree(jsonString) {
     try {
-        // 1. Reverse character replacements
-        const charMap = {
-            '.': '==',
-            '!': 'AAA',
-            '@': 'AAE',
-            '#': 'AEA',
-            '$': 'AEE',
-            '%': 'EAA',
-            '^': 'EAE',
-            '&': 'EEA',
-            '*': 'EEE'
-        };
-        
-        let restored = token;
-        for (const [short, long] of Object.entries(charMap)) {
-            restored = restored.split(short).join(long);
-        }
-        
-        // 2. Decompress
-        const jsonString = LZString.decompressFromBase64(restored);
-        if (!jsonString) return false;
-        
-        // 3. Parse compact array structure
         const data = JSON.parse(jsonString);
+        if (!Array.isArray(data) || data.length < 2) return false;
         
         // Clear existing tree
-        document.getElementById('skill-tree').innerHTML = '';
+        const tree = document.getElementById('skill-tree');
+        tree.innerHTML = '';
         connections.length = 0;
         nodeId = 0;
-
+        
         // Rebuild nodes
         const nodeMap = {};
-        data[0].forEach(node => {
-            const n = createNode(node[1], node[2], node[3], 80, 80, node[4]);
-            document.getElementById('skill-tree').appendChild(n);
-            makeDraggable(n);
-            nodeMap[node[0]] = n;
-            if (node[4]) centralNode = n;
+        data[0].forEach(n => {
+            const node = createNode(n[1], n[2], n[3], 80, 80, n[4]);
+            tree.appendChild(node);
+            makeDraggable(node);
+            nodeMap[n[0]] = node;
+            if (n[4]) centralNode = node;
         });
-
+        
         // Rebuild connections
-        data[1].forEach(conn => {
-            const n1 = nodeMap[conn[0]], n2 = nodeMap[conn[1]];
+        data[1].forEach(c => {
+            const n1 = nodeMap[c[0]], n2 = nodeMap[c[1]];
             if (n1 && n2) createConnection(n1, n2);
         });
-
+        
         // Restore theme
         if (data[2] !== undefined) {
             darkMode = data[2];
@@ -405,13 +358,30 @@ function importSkillTree(token) {
             document.getElementById('theme-toggle').innerHTML = 
                 darkMode ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
         }
-
+        
         return true;
     } catch (e) {
         console.error('Import failed:', e);
         return false;
     }
 }
+
+// Usage example:
+document.getElementById('export-btn').addEventListener('click', () => {
+    const json = exportSkillTree();
+    navigator.clipboard.writeText(json).then(() => {
+        //alert('Copied to clipboard!');
+    });
+});
+
+document.getElementById('import-btn').addEventListener('click', () => {
+    const json = document.getElementById('import-input').value;
+    if (json && importSkillTree(json)) {
+        //alert('Import successful!');
+    } else {
+        //alert('Invalid skill tree data!');
+    }
+});
 
 document.addEventListener('DOMContentLoaded', function () {
     const tree = document.getElementById("skill-tree");
